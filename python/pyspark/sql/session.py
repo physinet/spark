@@ -503,19 +503,21 @@ class SparkSession(SparkConversionMixin):
     def _inferSchemaFromList(self, data, names=None):
         """
         Infer schema from list of Row, dict, or tuple.
+
         Parameters
         ----------
         data : iterable
             list of Row, dict, or tuple
         names : list, optional
             list of column names
+
         Returns
         -------
         :class:`pyspark.sql.types.StructType`
         """
         if not data:
             return ArrayType(StructType([]))
-        infer_dict_as_struct = self._wrapped._conf.inferDictAsStruct()  # type: ignore
+        infer_dict_as_struct = self._wrapped._conf.inferDictAsStruct()  # type: ignore[attr-defined]
         prefer_timestamp_ntz = is_timestamp_ntz_preferred()
         schema = reduce(
             _merge_type,
