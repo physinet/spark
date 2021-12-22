@@ -27,6 +27,7 @@ import base64
 from array import array
 import ctypes
 from collections.abc import Iterable
+from functools import reduce
 from typing import (
     cast,
     overload,
@@ -1259,12 +1260,15 @@ def _infer_type(
                     )
             return MapType(NullType(), NullType(), True)
     elif isinstance(obj, list):
-        for v in obj:
-            if v is not None:
-                return ArrayType(
-                    _infer_type(obj[0], infer_dict_as_struct, prefer_timestamp_ntz), True
-                )
-        return ArrayType(NullType(), True)
+        if not obj:
+            return ArrayType(NullType(), True)
+        return ArrayType(
+            reduce(
+                _merge_type,
+                (_infer_type(v, infer_dict_as_struct, prefer_timestamp_ntz) for v in obj),
+            ),
+            True,
+        )
     elif isinstance(obj, array):
         if obj.typecode in _array_type_mappings:
             return ArrayType(_array_type_mappings[obj.typecode](), False)

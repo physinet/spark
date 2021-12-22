@@ -500,33 +500,27 @@ class SparkSession(SparkConversionMixin):
 
         return DataFrame(jdf, self._wrapped)
 
-    def _inferSchemaFromList(
-        self, data: Iterable[Any], names: Optional[List[str]] = None
-    ) -> StructType:
+    def _inferSchemaFromList(self, data, names=None):
         """
         Infer schema from list of Row, dict, or tuple.
-
         Parameters
         ----------
         data : iterable
             list of Row, dict, or tuple
         names : list, optional
             list of column names
-
         Returns
         -------
         :class:`pyspark.sql.types.StructType`
         """
         if not data:
-            raise ValueError("can not infer schema from empty dataset")
-        infer_dict_as_struct = self._wrapped._conf.inferDictAsStruct()  # type: ignore[attr-defined]
+            return ArrayType(StructType([]))
+        infer_dict_as_struct = self._wrapped._conf.inferDictAsStruct()  # type: ignore
         prefer_timestamp_ntz = is_timestamp_ntz_preferred()
         schema = reduce(
             _merge_type,
             (_infer_schema(row, names, infer_dict_as_struct, prefer_timestamp_ntz) for row in data),
         )
-        if _has_nulltype(schema):
-            raise ValueError("Some of types cannot be determined after inferring")
         return schema
 
     def _inferSchema(
@@ -633,6 +627,10 @@ class SparkSession(SparkConversionMixin):
         # make sure data could consumed multiple times
         if not isinstance(data, list):
             data = list(data)
+
+        # create an empty DataFrame if data is empty
+        if data == [] and schema is None:
+            schema = StructType([])
 
         if schema is None or isinstance(schema, (list, tuple)):
             struct = self._inferSchemaFromList(data, names=schema)
