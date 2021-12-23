@@ -1321,6 +1321,35 @@ def _infer_schema(
     return StructType(fields)
 
 
+def _infer_schema_from_list(
+    data: List[Any],
+    names: Optional[List[str]] = None,
+    infer_dict_as_struct: bool = False,
+    prefer_timestamp_ntz: bool = False,
+) -> StructType:
+    """
+    Infer schema from list of Row, dict, or tuple.
+
+    Parameters
+    ----------
+    data : iterable
+        list of Row, dict, or tuple
+    names : list, optional
+        list of column names
+
+    Returns
+    -------
+    :class:`pyspark.sql.types.StructType`
+    """
+    if not data:
+        return ArrayType(StructType([]))
+    schema = reduce(
+        _merge_type,
+        (_infer_schema(row, names, infer_dict_as_struct, prefer_timestamp_ntz) for row in data),
+    )
+    return schema
+
+
 def _has_nulltype(dt: DataType) -> bool:
     """Return whether there is a NullType in `dt` or not"""
     if isinstance(dt, StructType):

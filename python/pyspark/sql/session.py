@@ -17,7 +17,6 @@
 
 import sys
 import warnings
-from functools import reduce
 from threading import RLock
 from types import TracebackType
 from typing import (
@@ -47,12 +46,12 @@ from pyspark.sql.readwriter import DataFrameReader
 from pyspark.sql.sql_formatter import SQLStringFormatter
 from pyspark.sql.streaming import DataStreamReader
 from pyspark.sql.types import (
-    ArrayType,
     AtomicType,
     DataType,
     StructType,
     _make_type_verifier,
     _infer_schema,
+    _infer_schema_from_list,
     _has_nulltype,
     _merge_type,
     _create_converter,
@@ -516,13 +515,13 @@ class SparkSession(SparkConversionMixin):
         -------
         :class:`pyspark.sql.types.StructType`
         """
-        if not data:
-            return ArrayType(StructType([]))
         infer_dict_as_struct = self._wrapped._conf.inferDictAsStruct()  # type: ignore[attr-defined]
         prefer_timestamp_ntz = is_timestamp_ntz_preferred()
-        schema = reduce(
-            _merge_type,
-            (_infer_schema(row, names, infer_dict_as_struct, prefer_timestamp_ntz) for row in data),
+        schema = _infer_schema_from_list(
+            data,
+            names=names,
+            infer_dict_as_struct=infer_dict_as_struct,
+            prefer_timestamp_ntz=prefer_timestamp_ntz,
         )
         return schema
 
