@@ -47,6 +47,7 @@ from pyspark.sql.readwriter import DataFrameReader
 from pyspark.sql.sql_formatter import SQLStringFormatter
 from pyspark.sql.streaming import DataStreamReader
 from pyspark.sql.types import (
+    ArrayType,
     AtomicType,
     DataType,
     StructType,

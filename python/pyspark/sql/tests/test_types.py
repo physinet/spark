@@ -156,6 +156,7 @@ class TypesTests(ReusedSQLTestCase):
             Row(a=1),
             Row("a")(1),
             A(),
+            None,
         ]
 
         df = self.spark.createDataFrame([data])
@@ -178,6 +179,7 @@ class TypesTests(ReusedSQLTestCase):
             "struct<a:bigint>",
             "struct<a:bigint>",
             "struct<a:bigint>",
+            "void",
         ]
         self.assertEqual(actual, expected)
 
@@ -200,6 +202,7 @@ class TypesTests(ReusedSQLTestCase):
             Row(a=1),
             Row(a=1),
             Row(a=1),
+            None,
         ]
         self.assertEqual(actual, expected)
 
@@ -272,6 +275,22 @@ class TypesTests(ReusedSQLTestCase):
 
             df = self.spark.createDataFrame(data)
             self.assertEqual(Row(f1=[Row(payment=200.5, name="A")], f2=[1, 2]), df.first())
+
+    def test_infer_array_schema_with_dict_as_struct(self):
+        NestedRow = Row("f1", "f2")
+
+        with self.sql_conf({"spark.sql.pyspark.inferNestedDictAsStruct.enabled": True}):
+            data = [
+                NestedRow([{"payment": 200.5}], [1, 2]),
+                NestedRow([{"name": "B"}], [2, 3]),
+            ]
+
+            nestedRdd = self.sc.parallelize(data)
+            df = self.spark.createDataFrame(nestedRdd, samplingRatio=1)
+            self.assertEqual(Row(f1=[Row(payment=200.5, name=None)], f2=[1, 2]), df.first())
+
+            df = self.spark.createDataFrame(data)
+            self.assertEqual(Row(f1=[Row(payment=200.5, name=None)], f2=[1, 2]), df.first())
 
     def test_create_dataframe_from_dict_respects_schema(self):
         df = self.spark.createDataFrame([{"a": 1}], ["b"])
@@ -1004,6 +1023,11 @@ class TypesTests(ReusedSQLTestCase):
 
         for n, (a, e) in enumerate(zip(actual, expected)):
             self.assertEqual(a, e, "%s does not match with %s" % (exprs[n], expected[n]))
+
+    def test_empty_dataframe(self):
+        df = self.spark.createDataFrame([])
+        self.assertEqual(df.count(), 0)
+        self.assertEqual(df.columns, [])
 
 
 class DataTypeTests(unittest.TestCase):
