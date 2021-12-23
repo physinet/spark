@@ -500,7 +500,9 @@ class SparkSession(SparkConversionMixin):
 
         return DataFrame(jdf, self._wrapped)
 
-    def _inferSchemaFromList(self, data, names=None):
+    def _inferSchemaFromList(
+        self, data: Iterable[Any], names: Optional[List[str]] = None
+    ) -> StructType:
         """
         Infer schema from list of Row, dict, or tuple.
 
