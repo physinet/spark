@@ -122,7 +122,22 @@ class ColumnTests(ReusedSQLTestCase):
         self.assertEqual([("数量", "bigint")], df.dtypes)
         self.assertEqual(1, df.select("数量").first()[0])
         self.assertEqual(1, df.select(df["数量"]).first()[0])
-        self.assertTrue(columnName in repr(df[columnName]))
+        self.assertTrue(columnName == df[columnName]._name)
+
+    def test_column_name_with_alias(self):
+        columnName = "column"
+        df = self.spark.createDataFrame([(1,)], (columnName,))
+        column = df[columnName]
+        self.assertEqual(df.columns[0], columnName)
+        self.assertEqual(column._name, columnName)
+        self.assertEqual(column._alias, "")
+
+        alias = "alias"
+        column = column.alias(alias)
+        df = df.select(column)
+        self.assertEqual(df.columns[0], alias)
+        self.assertEqual(column._name, f"{columnName} AS {alias}")
+        self.assertEqual(column._alias, alias)
 
     def test_field_accessor(self):
         df = self.sc.parallelize([Row(l=[1], r=Row(a=1, b="b"), d={"k": "v"})]).toDF()

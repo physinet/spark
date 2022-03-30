@@ -839,6 +839,8 @@ class Column:
     isNull = _unary_op("isNull", _isNull_doc)
     isNotNull = _unary_op("isNotNull", _isNotNull_doc)
 
+    _alias = ""
+
     def alias(self, *alias: str, **kwargs: Any) -> "Column":
         """
         Returns this column aliased with a new name or names (in the case of expressions that
@@ -878,12 +880,17 @@ class Column:
             if metadata:
                 assert sc._jvm is not None
                 jmeta = sc._jvm.org.apache.spark.sql.types.Metadata.fromJson(json.dumps(metadata))
-                return Column(getattr(self._jc, "as")(alias[0], jmeta))
+                column = Column(getattr(self._jc, "as")(alias[0], jmeta))
+                column._alias = alias[0]
+                return column
             else:
-                return Column(getattr(self._jc, "as")(alias[0]))
+                column = Column(getattr(self._jc, "as")(alias[0]))
+                column._alias = alias[0]
+                return column
         else:
             if metadata:
                 raise ValueError("metadata can only be provided for a single column")
+            self._alias = alias
             return Column(getattr(self._jc, "as")(_to_seq(sc, list(alias))))
 
     name = copy_func(alias, sinceversion=2.0, doc=":func:`name` is an alias for :func:`alias`.")
@@ -1048,8 +1055,17 @@ class Column:
 
     __bool__ = __nonzero__
 
+    @property
+    def _name(self) -> str:
+        """
+        Returns the string representation of the column name, without resolving any aliases.
+
+        .. versionadded:: 3.3.0
+        """
+        return self._jc.toString()
+
     def __repr__(self) -> str:
-        return "Column<'%s'>" % self._jc.toString()
+        return "Column<'%s'>" % self._name
 
 
 def _test() -> None:
