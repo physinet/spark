@@ -890,7 +890,6 @@ class Column:
         else:
             if metadata:
                 raise ValueError("metadata can only be provided for a single column")
-            self._alias = alias
             return Column(getattr(self._jc, "as")(_to_seq(sc, list(alias))))
 
     name = copy_func(alias, sinceversion=2.0, doc=":func:`name` is an alias for :func:`alias`.")
