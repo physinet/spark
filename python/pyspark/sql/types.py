@@ -44,8 +44,8 @@ from typing import (
     TypeVar,
 )
 
-from py4j.protocol import register_input_converter  # type: ignore[import]
-from py4j.java_gateway import JavaClass, JavaGateway, JavaObject  # type: ignore[import]
+from py4j.protocol import register_input_converter
+from py4j.java_gateway import JavaClass, JavaGateway, JavaObject
 
 from pyspark.serializers import CloudPickleSerializer
 
@@ -81,7 +81,7 @@ class DataType:
     """Base class for data types."""
 
     def __repr__(self) -> str:
-        return self.__class__.__name__
+        return self.__class__.__name__ + "()"
 
     def __hash__(self) -> int:
         return hash(str(self))
@@ -365,7 +365,7 @@ class DayTimeIntervalType(AtomicType):
     jsonValue = _str_repr
 
     def __repr__(self) -> str:
-        return "%s(%d,%d)" % (type(self).__name__, self.startField, self.endField)
+        return "%s(%d, %d)" % (type(self).__name__, self.startField, self.endField)
 
     def needConversion(self) -> bool:
         return True
@@ -416,7 +416,7 @@ class ArrayType(DataType):
         return "array<%s>" % self.elementType.simpleString()
 
     def __repr__(self) -> str:
-        return "ArrayType(%s,%s)" % (self.elementType, str(self.containsNull).lower())
+        return "ArrayType(%s, %s)" % (self.elementType, str(self.containsNull))
 
     def jsonValue(self) -> Dict[str, Any]:
         return {
@@ -486,11 +486,7 @@ class MapType(DataType):
         return "map<%s,%s>" % (self.keyType.simpleString(), self.valueType.simpleString())
 
     def __repr__(self) -> str:
-        return "MapType(%s,%s,%s)" % (
-            self.keyType,
-            self.valueType,
-            str(self.valueContainsNull).lower(),
-        )
+        return "MapType(%s, %s, %s)" % (self.keyType, self.valueType, str(self.valueContainsNull))
 
     def jsonValue(self) -> Dict[str, Any]:
         return {
@@ -571,7 +567,7 @@ class StructField(DataType):
         return "%s:%s" % (self.name, self.dataType.simpleString())
 
     def __repr__(self) -> str:
-        return "StructField(%s,%s,%s)" % (self.name, self.dataType, str(self.nullable).lower())
+        return "StructField('%s', %s, %s)" % (self.name, self.dataType, str(self.nullable))
 
     def jsonValue(self) -> Dict[str, Any]:
         return {
@@ -617,9 +613,9 @@ class StructType(DataType):
     --------
     >>> struct1 = StructType([StructField("f1", StringType(), True)])
     >>> struct1["f1"]
-    StructField(f1,StringType,true)
+    StructField('f1', StringType(), True)
     >>> struct1[0]
-    StructField(f1,StringType,true)
+    StructField('f1', StringType(), True)
 
     >>> struct1 = StructType([StructField("f1", StringType(), True)])
     >>> struct2 = StructType([StructField("f1", StringType(), True)])
@@ -754,7 +750,7 @@ class StructType(DataType):
         return "struct<%s>" % (",".join(f.simpleString() for f in self))
 
     def __repr__(self) -> str:
-        return "StructType(List(%s))" % ",".join(str(field) for field in self)
+        return "StructType([%s])" % ", ".join(str(field) for field in self)
 
     def jsonValue(self) -> Dict[str, Any]:
         return {"type": self.typeName(), "fields": [f.jsonValue() for f in self]}
@@ -980,17 +976,17 @@ def _parse_datatype_string(s: str) -> DataType:
     Examples
     --------
     >>> _parse_datatype_string("int ")
-    IntegerType
+    IntegerType()
     >>> _parse_datatype_string("INT ")
-    IntegerType
+    IntegerType()
     >>> _parse_datatype_string("a: byte, b: decimal(  16 , 8   ) ")
-    StructType(List(StructField(a,ByteType,true),StructField(b,DecimalType(16,8),true)))
+    StructType([StructField('a', ByteType(), True), StructField('b', DecimalType(16,8), True)])
     >>> _parse_datatype_string("a DOUBLE, b STRING")
-    StructType(List(StructField(a,DoubleType,true),StructField(b,StringType,true)))
+    StructType([StructField('a', DoubleType(), True), StructField('b', StringType(), True)])
     >>> _parse_datatype_string("a: array< short>")
-    StructType(List(StructField(a,ArrayType(ShortType,true),true)))
+    StructType([StructField('a', ArrayType(ShortType(), True), True)])
     >>> _parse_datatype_string(" map<string , string > ")
-    MapType(StringType,StringType,true)
+    MapType(StringType(), StringType(), True)
 
     >>> # Error cases
     >>> _parse_datatype_string("blabla") # doctest: +IGNORE_EXCEPTION_DETAIL
@@ -1012,7 +1008,7 @@ def _parse_datatype_string(s: str) -> DataType:
     """
     from pyspark import SparkContext
 
-    sc = SparkContext._active_spark_context  # type: ignore[attr-defined]
+    sc = SparkContext._active_spark_context
     assert sc is not None
 
     def from_ddl_schema(type_str: str) -> DataType:
@@ -1034,11 +1030,11 @@ def _parse_datatype_string(s: str) -> DataType:
         try:
             # For backwards compatibility, "integer", "struct<fieldname: datatype>" and etc.
             return from_ddl_datatype(s)
-        except:
+        except BaseException:
             try:
                 # For backwards compatibility, "fieldname: datatype, fieldname: datatype" case.
                 return from_ddl_datatype("struct<%s>" % s.strip())
-            except:
+            except BaseException:
                 raise e
 
 
@@ -1388,11 +1384,20 @@ def _merge_type(
     name: Optional[str] = None,
 ) -> Union[StructType, ArrayType, MapType, DataType]:
     if name is None:
-        new_msg = lambda msg: msg
-        new_name = lambda n: "field %s" % n
+
+        def new_msg(msg: str) -> str:
+            return msg
+
+        def new_name(n: str) -> str:
+            return "field %s" % n
+
     else:
-        new_msg = lambda msg: "%s: %s" % (name, msg)
-        new_name = lambda n: "field %s in %s" % (n, name)
+
+        def new_msg(msg: str) -> str:
+            return "%s: %s" % (name, msg)
+
+        def new_name(n: str) -> str:
+            return "field %s in %s" % (n, name)
 
     if isinstance(a, NullType):
         return b
@@ -1584,11 +1589,20 @@ def _make_type_verifier(
     """
 
     if name is None:
-        new_msg = lambda msg: msg
-        new_name = lambda n: "field %s" % n
+
+        def new_msg(msg: str) -> str:
+            return msg
+
+        def new_name(n: str) -> str:
+            return "field %s" % n
+
     else:
-        new_msg = lambda msg: "%s: %s" % (name, msg)
-        new_name = lambda n: "field %s in %s" % (n, name)
+
+        def new_msg(msg: str) -> str:
+            return "%s: %s" % (name, msg)
+
+        def new_name(n: str) -> str:
+            return "field %s in %s" % (n, name)
 
     def verify_nullability(obj: Any) -> bool:
         if obj is None:
@@ -1608,14 +1622,15 @@ def _make_type_verifier(
 
     def verify_acceptable_types(obj: Any) -> None:
         # subclass of them can not be fromInternal in JVM
-        if type(obj) not in _acceptable_types[_type]:  # type: ignore[operator]
+        if type(obj) not in _acceptable_types[_type]:
             raise TypeError(
                 new_msg("%s can not accept object %r in type %s" % (dataType, obj, type(obj)))
             )
 
     if isinstance(dataType, StringType):
         # StringType can work with any types
-        verify_value = lambda _: _
+        def verify_value(obj: Any) -> None:
+            pass
 
     elif isinstance(dataType, UserDefinedType):
         verifier = _make_type_verifier(dataType.sqlType(), name=name)
@@ -1698,9 +1713,7 @@ def _make_type_verifier(
     elif isinstance(dataType, StructType):
         verifiers = []
         for f in dataType.fields:
-            verifier = _make_type_verifier(
-                f.dataType, f.nullable, name=new_name(f.name)
-            )  # type: ignore[arg-type]
+            verifier = _make_type_verifier(f.dataType, f.nullable, name=new_name(f.name))
             verifiers.append((f.name, verifier))
 
         def verify_struct(obj: Any) -> None:
