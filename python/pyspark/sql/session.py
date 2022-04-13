@@ -511,7 +511,7 @@ class SparkSession(SparkConversionMixin):
         :class:`pyspark.sql.types.StructType`
         """
         if not data:
-            raise ValueError("can not infer schema from empty dataset")
+            return StructType([])
         infer_dict_as_struct = self._jconf.inferDictAsStruct()
         prefer_timestamp_ntz = is_timestamp_ntz_preferred()
         schema = reduce(
