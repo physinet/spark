@@ -1259,8 +1259,7 @@ def _infer_type(
         return ArrayType(
             reduce(
                 _merge_type,
-                (_infer_type(v, infer_dict_as_struct, prefer_timestamp_ntz) for v in obj),
-                NullType(),
+                (_infer_type(v, infer_dict_as_struct, prefer_timestamp_ntz) for v in (None, *obj)),
             ),
             True,
         )
