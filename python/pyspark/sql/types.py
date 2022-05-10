@@ -60,7 +60,6 @@ __all__ = [
     "BooleanType",
     "DateType",
     "TimestampType",
-    "TimestampNTZType",
     "DecimalType",
     "DoubleType",
     "FloatType",

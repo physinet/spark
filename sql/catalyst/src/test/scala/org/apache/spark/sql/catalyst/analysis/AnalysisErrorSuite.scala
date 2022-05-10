@@ -31,6 +31,7 @@ import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.util.{ArrayBasedMapData, GenericArrayData, MapData}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
+import org.apache.spark.unsafe.types.UTF8String
 
 private[sql] case class GroupableData(data: Int) {
   def getData: Int = data
@@ -532,6 +533,45 @@ class AnalysisErrorSuite extends AnalysisTest {
   )
 
   errorTest(
+    "an evaluated offset class must not be string",
+    testRelation.offset(Literal(UTF8String.fromString("abc"), StringType)),
+    "The offset expression must be integer type, but got string" :: Nil
+  )
+
+  errorTest(
+    "an evaluated offset class must not be long",
+    testRelation.offset(Literal(10L, LongType)),
+    "The offset expression must be integer type, but got bigint" :: Nil
+  )
+
+  errorTest(
+    "an evaluated offset class must not be null",
+    testRelation.offset(Literal(null, IntegerType)),
+    "The evaluated offset expression must not be null, but got " :: Nil
+  )
+
+  errorTest(
+    "num_rows in offset clause must be equal to or greater than 0",
+    testRelation.offset(-1),
+    "The offset expression must be equal to or greater than 0, but got -1" :: Nil
+  )
+
+  errorTest(
+    "OFFSET clause in other node",
+    testRelation2.offset(Literal(10, IntegerType)).where('b > 1),
+    "The OFFSET clause is allowed in the LIMIT clause or be the outermost node," +
+      " but the OFFSET clause found in: Filter." :: Nil
+  )
+
+  errorTest(
+    "the sum of num_rows in limit clause and num_rows in offset clause less than Int.MaxValue",
+    testRelation.offset(Literal(2000000000, IntegerType)).limit(Literal(1000000000, IntegerType)),
+    "The sum of the LIMIT clause and the OFFSET clause must not be greater than" +
+      " the maximum 32-bit integer value (2,147,483,647)," +
+      " but found limit = 1000000000, offset = 2000000000." :: Nil
+  )
+
+  errorTest(
     "more than one generators in SELECT",
     listRelation.select(Explode($"list"), Explode($"list")),
     "Only one generator allowed per select clause but found 2: explode(list), explode(list)" :: Nil
@@ -544,6 +584,22 @@ class AnalysisErrorSuite extends AnalysisTest {
     "Only one generator allowed per select clause but found 2: " +
       "explode(array(min(a))), explode(array(max(a)))" :: Nil
   )
+
+  errorTest(
+    "SPARK-38666: non-boolean aggregate filter",
+    CatalystSqlParser.parsePlan("SELECT sum(c) filter (where e) FROM TaBlE2"),
+    "FILTER expression is not of type boolean" :: Nil)
+
+  errorTest(
+    "SPARK-38666: aggregate in aggregate filter",
+    CatalystSqlParser.parsePlan("SELECT sum(c) filter (where max(e) > 1) FROM TaBlE2"),
+    "FILTER expression contains aggregate" :: Nil)
+
+  errorTest(
+    "SPARK-38666: window function in aggregate filter",
+    CatalystSqlParser.parsePlan("SELECT sum(c) " +
+       "filter (where nth_value(e, 2) over(order by b) > 1) FROM TaBlE2"),
+    "FILTER expression contains window function" :: Nil)
 
   test("SPARK-6452 regression test") {
     // CheckAnalysis should throw AnalysisException when Aggregate contains missing attribute(s)
@@ -641,20 +697,20 @@ class AnalysisErrorSuite extends AnalysisTest {
   }
 
   test("Join can work on binary types but can't work on map types") {
-    val left = LocalRelation(Symbol("a").binary, Symbol("b").map(StringType, StringType))
-    val right = LocalRelation(Symbol("c").binary, Symbol("d").map(StringType, StringType))
+    val left = LocalRelation($"a".binary, Symbol("b").map(StringType, StringType))
+    val right = LocalRelation($"c".binary, Symbol("d").map(StringType, StringType))
 
     val plan1 = left.join(
       right,
       joinType = Cross,
-      condition = Some(Symbol("a") === Symbol("c")))
+      condition = Some($"a" === $"c"))
 
     assertAnalysisSuccess(plan1)
 
     val plan2 = left.join(
       right,
       joinType = Cross,
-      condition = Some(Symbol("b") === Symbol("d")))
+      condition = Some($"b" === $"d"))
     assertAnalysisError(plan2, "EqualTo does not support ordering on type map" :: Nil)
   }
 
@@ -722,7 +778,7 @@ class AnalysisErrorSuite extends AnalysisTest {
   test("Error on filter condition containing aggregate expressions") {
     val a = AttributeReference("a", IntegerType)()
     val b = AttributeReference("b", IntegerType)()
-    val plan = Filter(Symbol("a") === UnresolvedFunction("max", Seq(b), true), LocalRelation(a, b))
+    val plan = Filter($"a" === UnresolvedFunction("max", Seq(b), true), LocalRelation(a, b))
     assertAnalysisError(plan,
       "Aggregate/Window/Generate expressions are not valid in where clause of the query" :: Nil)
   }

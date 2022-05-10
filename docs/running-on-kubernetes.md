@@ -1699,7 +1699,7 @@ Kubernetes supports [Pod priority](https://kubernetes.io/docs/concepts/schedulin
 
 Spark on Kubernetes allows defining the priority of jobs by [Pod template](#pod-template). The user can specify the <code>priorityClassName</code> in driver or executor Pod template <code>spec</code> section. Below is an example to show how to specify it:
 
-```
+```yaml
 apiVersion: v1
 Kind: Pod
 metadata:
@@ -1717,20 +1717,20 @@ spec:
 
 Spark allows users to specify a custom Kubernetes schedulers.
 
-1. Specify scheduler name.
+1. Specify a scheduler name.
 
    Users can specify a custom scheduler using <code>spark.kubernetes.scheduler.name</code> or
    <code>spark.kubernetes.{driver/executor}.scheduler.name</code> configuration.
 
 2. Specify scheduler related configurations.
 
-   To configure the custom scheduler the user can use [Pod templates](#pod-template), add labels (<code>spark.kubernetes.{driver,executor}.label.*</code>)  and/or annotations (<code>spark.kubernetes.{driver/executor}.annotation.*</code>).
+   To configure the custom scheduler the user can use [Pod templates](#pod-template), add labels (<code>spark.kubernetes.{driver,executor}.label.*</code>), annotations (<code>spark.kubernetes.{driver/executor}.annotation.*</code>) or scheduler specific configurations (such as <code>spark.kubernetes.scheduler.volcano.podGroupTemplateFile</code>).
 
 3. Specify scheduler feature step.
 
    Users may also consider to use <code>spark.kubernetes.{driver/executor}.pod.featureSteps</code> to support more complex requirements, including but not limited to:
-  - Create additional Kubernetes custom resources for driver/executor scheduling.
-  - Set scheduler hints according to configuration or existing Pod info dynamically.
+   - Create additional Kubernetes custom resources for driver/executor scheduling.
+   - Set scheduler hints according to configuration or existing Pod info dynamically.
 
 #### Using Volcano as Customized Scheduler for Spark on Kubernetes
 
@@ -1766,7 +1766,7 @@ To use Volcano as a custom scheduler the user needs to specify the following con
 --conf spark.kubernetes.scheduler.volcano.podGroupTemplateFile=/path/to/podgroup-template.yaml
 # Specify driver/executor VolcanoFeatureStep
 --conf spark.kubernetes.driver.pod.featureSteps=org.apache.spark.deploy.k8s.features.VolcanoFeatureStep
---conf spark.kubernetes.executor.pod.featureSteps=org.apache.spark.deploy.k8s.features.VolcanoFeatureStep```
+--conf spark.kubernetes.executor.pod.featureSteps=org.apache.spark.deploy.k8s.features.VolcanoFeatureStep
 ```
 
 ##### Volcano Feature Step
